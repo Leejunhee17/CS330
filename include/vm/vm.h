@@ -2,6 +2,10 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include <hash.h>
+#include <bitmap.h>
+#include "threads/vaddr.h"
+#include "threads/mmu.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -17,7 +21,7 @@ enum vm_type {
 
 	/* Auxillary bit flag marker for store information. You can add more
 	 * markers, until the value is fit in the int. */
-	VM_MARKER_0 = (1 << 3),
+	VM_MARKER_STACK = (1 << 3),
 	VM_MARKER_1 = (1 << 4),
 
 	/* DO NOT EXCEED THIS VALUE. */
@@ -46,7 +50,8 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
-
+	struct hash_elem p_elem;
+	bool writable;
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
@@ -63,6 +68,7 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	struct list_elem f_elem;
 };
 
 /* The function table for page operations.
@@ -85,7 +91,23 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	struct hash spt_hash;
 };
+
+struct parameters {
+	struct file *file;
+	off_t ofs;
+	size_t page_read_bytes;
+};
+
+struct list frame_table;
+struct bitmap *swap_table;
+
+uint64_t spt_hash_func (const struct hash_elem *e, void *aux);
+bool spt_less_func (const struct hash_elem *a,
+		const struct hash_elem *b,
+		void *aux);
+void spt_hash_destruction_func (struct hash_elem *e, void *aux);
 
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);

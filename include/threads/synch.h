@@ -28,10 +28,15 @@ bool lock_try_acquire (struct lock *);
 void lock_release (struct lock *);
 bool lock_held_by_current_thread (const struct lock *);
 
+bool greater_waiter_priority (const struct list_elem *a, const struct list_elem *b, void*aux);
+void update_priority_by_donate (void);
+
 /* Condition variable. */
 struct condition {
 	struct list waiters;        /* List of waiting threads. */
 };
+
+bool greater_sema_priority (const struct list_elem *a, const struct list_elem *b, void*aux);
 
 void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);

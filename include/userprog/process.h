@@ -10,4 +10,10 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
 
+struct thread *process_get_child (tid_t pid);
+void process_remove_child (struct thread *child);
+int process_add_file (struct file *f);
+struct file *process_get_file (int fd);
+void process_close_file(int fd);
+
 #endif /* userprog/process.h */

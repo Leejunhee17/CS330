@@ -10,6 +10,7 @@
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixed_point.h"
 #include "intrinsic.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -24,9 +25,13 @@
    Do not modify this value. */
 #define THREAD_BASIC 0xd42df210
 
+int load_avg; // fixed_point
+
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -108,6 +113,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -125,6 +131,8 @@ thread_start (void) {
 	struct semaphore idle_started;
 	sema_init (&idle_started, 0);
 	thread_create ("idle", PRI_MIN, idle, &idle_started);
+
+	load_avg = 0;
 
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
@@ -170,7 +178,7 @@ thread_print_stats (void) {
    scheduled before thread_create() returns.  It could even exit
    before thread_create() returns.  Contrariwise, the original
    thread may run for any amount of time before the new thread is
-   scheduled.  Use a semaphore or some other form of
+   scheduled.  Use a semaphore or some other form ofsema_for_load
    synchronization if you need to ensure ordering.
 
    The code provided sets the new thread's `priority' member to
@@ -193,6 +201,17 @@ thread_create (const char *name, int priority,
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
 
+	struct thread *curr = thread_current ();
+	t->parent = curr;
+	list_push_back (&curr->children, &t->c_elem);
+	sema_init (&t->sema_for_wait, 0);
+	sema_init (&t->sema_for_exit, 0);
+	sema_init (&t->sema_for_fork, 0);
+	t->fd_ptr = 2;
+	// t->fd_table = palloc_get_page (PAL_ZERO);
+	t->fd_table = palloc_get_multiple (PAL_ZERO, 3);
+	// printf ("thread_create: process(%s)[%d] create child process(%s)[%d] in [%d]children\n", curr->name, curr->tid, t->name, t->tid, list_size (&curr->children));
+
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t) kernel_thread;
@@ -206,6 +225,10 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
+	// 생성된 thread가 priority가 더 높다면 CPU 양보
+	// printf ("priority? cur=%d new=%d\n" ,thread_current()->priority, priority);
+	if (curr->priority < priority)
+		thread_yield ();
 
 	return tid;
 }
@@ -240,7 +263,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	// priority 내림차순으로 삽입 -> ready_list의 첫 thread는 항상 list의 max priority
+	list_insert_ordered (&ready_list, &t->elem, greater_priority, 0);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -303,15 +327,58 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		// priority 내림차순으로 삽입 -> ready_list의 첫 thread는 항상 list의 max priority
+		list_insert_ordered (&ready_list, &curr->elem, greater_priority, 0);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+void
+thread_sleep (int64_t ticks) {
+	enum intr_level old_level;
+
+	ASSERT (!intr_context ());
+	old_level = intr_disable ();
+
+	// 깨어날 알람 틱을 thread에 저장하고 sleep_list에 추가하고 block
+	thread_current ()->alarm_tick = ticks;
+	list_push_back (&sleep_list, &thread_current ()->elem);
+	thread_block ();
+
+	intr_set_level (old_level);
+}
+
+void
+thread_awake (int64_t ticks) {
+	// sleep_list에서 알람 틱이 지난 thread들을 모두 unblock
+	if (list_empty (&sleep_list))
+		return;
+	struct list_elem *e = list_begin (&sleep_list);
+	while (e != list_end (&sleep_list)) {
+		struct thread *t = list_entry (e, struct thread, elem);
+		if (t->alarm_tick <= ticks) {
+			e = list_remove (e);
+			thread_unblock (t);
+		}
+		else {
+			e = list_next(e);
+		}
+	}
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+	if(thread_mlfqs == true) {
+		return;
+	}
+	// thread의 새로운 priority를 세팅하고 바뀐 priority에 맞게 donated priority 갱신 및 CPU 점유 thread 갱신
+	ASSERT(thread_current () != idle_thread);
+	// printf ("Thread[%s] set priority [%d]->[%d]\n", thread_current ()-> name, thread_get_priority (), new_priority);
 	thread_current ()->priority = new_priority;
+	thread_current ()->init_priority = new_priority;
+	update_priority_by_donate ();
+	update_running_thread ();
 }
 
 /* Returns the current thread's priority. */
@@ -320,31 +387,194 @@ thread_get_priority (void) {
 	return thread_current ()->priority;
 }
 
+void
+update_running_thread (void) {
+	// 현재 thread보다 높은 priority의 thread가 ready_list에 있다면 CPU 양보
+	struct thread *max_t = list_entry(list_begin(&ready_list), struct thread, elem);
+	// printf ("ready_list max priority %d in #%d\n", max_t->priority, list_size(&ready_list));
+	if (thread_get_priority () < max_t->priority) {
+		thread_yield();
+	}
+}
+
+bool
+greater_priority (const struct list_elem *a, const struct list_elem *b, void *aux) {
+	struct thread *t1 = list_entry (a, struct thread, elem);
+	struct thread *t2 = list_entry (b, struct thread, elem);
+	if (t1->priority > t2->priority) {
+		return true;
+	}
+	return false;
+}
+
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) {
 	/* TODO: Your implementation goes here */
+	// printf ("set_nice\n");
+	enum intr_level old_level;
+
+	ASSERT (!intr_context ());
+	old_level = intr_disable ();
+
+	thread_current ()->nice = nice;
+	// 변경된 nice로 priority 다시 계산
+	calc_priority(thread_current ());
+	// 변경된 priority에 맞게 CPU 점유 thread 갱신
+	update_running_thread ();
+
+	intr_set_level (old_level);
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	enum intr_level old_level;
+
+	ASSERT (!intr_context ());
+	old_level = intr_disable ();
+
+	int ret = thread_current ()->nice;
+
+	intr_set_level (old_level);
+	return ret;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	enum intr_level old_level;
+
+	ASSERT (!intr_context ());
+	old_level = intr_disable ();
+
+	int ret = fp2int_nearest(fp_mul_int(load_avg, 100));
+
+	intr_set_level (old_level);
+	return ret;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	enum intr_level old_level;
+
+	ASSERT (!intr_context ());
+	old_level = intr_disable ();
+
+	int ret = fp2int_nearest(fp_mul_int(thread_current ()->recent_cpu, 100));
+
+	intr_set_level (old_level);
+	return ret;
+}
+
+void
+calc_load_avg (void) {
+	// 계산식: load_avg = (59/60) * load_avg + (1/60) * ready_threads
+	int c1 = fp_div_fp (int2fp (59), int2fp (60));
+	int c2 = fp_div_fp (int2fp (1), int2fp (60));
+
+	int ready_threads = list_size (&ready_list);
+	if (thread_current () != idle_thread)
+		ready_threads += 1;
+	int x = fp_mul_fp (c1, load_avg);
+	int y = fp_mul_int (c2, ready_threads);
+	int ret = fp_add_fp (x, y);
+	// printf ("%d threads\n", ready_threads);
+	// printf ("calc_load_avg %d\n", ret);
+	load_avg = ret;
+}
+
+void
+increase_recent_cpu (struct thread *t) {
+	// 계산식: recent_cpu++
+	// idle은 계산 X
+	if (t == idle_thread)
+		return;
+	t->recent_cpu = fp_add_int(t->recent_cpu, 1);
+	// printf ("increase recent_cpu? %d\n", t->recent_cpu);
+}
+
+void
+calc_recent_cpu (struct thread *t) {
+	// 계산식: recent_cpu = (2 * load_avg) / (2 * load_avg + 1) * recent_cpu + nice
+	// idle은 계산 X
+	if (t == idle_thread)
+		return;
+	// printf ("thread[%s] calc_recent_cpu? %d\n", t->name ,t->recent_cpu);
+	int recent_cpu = t->recent_cpu;
+	int a = fp_mul_int (load_avg, 2);
+	// printf ("%d\n", a);
+	int b = fp_add_int (a, 1);
+	// printf ("%d\n", b);
+	int c = fp_div_fp (a, b);
+	// printf ("%d\n", c);
+	int d = fp_mul_fp (c, recent_cpu);
+	t->recent_cpu = fp_add_int (d, t->nice);
+	// printf ("thread[%s] calc_recent_cpu -> %d\n", t->name ,t->recent_cpu);
+}
+
+void
+calc_priority (struct thread *t) {
+	// 계산식: priority = PRI_MAX - (recent_cpu / 4) - (nice * 2)
+	// idle은 계산 X
+	if (t == idle_thread)
+		return;
+	int a = int2fp (PRI_MAX - (t->nice * 2));
+	int b = fp_div_int (t->recent_cpu, 4);
+	int ret = fp_sub_fp (a, b);
+	t->priority = fp2int (ret);
+}
+
+void
+update_recent_cpu_all (void) {
+	// 모든 thread의 recent_cpu 값 갱신
+	calc_recent_cpu(thread_current ());
+	struct list_elem *e;
+	struct thread *t;
+	if (!list_empty (&ready_list)) {
+		e = list_begin (&ready_list);
+		while (e != list_end (&ready_list)) {
+			t = list_entry (e, struct thread, elem);
+			calc_recent_cpu(t);
+			e = list_next (e);
+		}
+	}
+	if (!list_empty (&sleep_list)) {
+		e = list_begin (&sleep_list);
+		while (e != list_end (&sleep_list)) {
+			t = list_entry (e, struct thread, elem);
+			calc_recent_cpu(t);
+			e = list_next (e);
+		}
+	}
+}
+
+void
+update_priority_all (void) {
+	// 모든 thread의 priority 값 갱신
+	calc_priority(thread_current ());
+	struct list_elem *e;
+	struct thread *t;
+	if (!list_empty (&ready_list)) {
+		e = list_begin (&ready_list);
+		while (e != list_end (&ready_list)) {
+			t = list_entry (e, struct thread, elem);
+			calc_priority(t);
+			e = list_next (e);
+		}
+	}
+	if (!list_empty (&sleep_list)) {
+		e = list_begin (&sleep_list);
+		while (e != list_end (&sleep_list)) {
+			t = list_entry (e, struct thread, elem);
+			calc_priority(t);
+			e = list_next (e);
+		}
+	}
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -409,6 +639,15 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	t->init_priority = t->priority;
+	t->waiting_lock == NULL;
+	list_init(&t->waiters);
+	t->nice = 0;
+	t->recent_cpu = 0;
+	
+	list_init(&t->children);
+	// printf("init_thread: process(%s) [%d]children\n", t->name, list_size (&t->children));
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -459,8 +698,8 @@ do_iret (struct intr_frame *tf) {
    PREV, the new thread is already running, and interrupts are
    still disabled.
 
-   It's not safe to call printf() until the thread switch is
-   complete.  In practice that means that printf()s should be
+   It's not safe to call printf () until the thread switch is
+   complete.  In practice that means that printf ()s should be
    added at the end of the function. */
 static void
 thread_launch (struct thread *th) {
@@ -524,7 +763,7 @@ thread_launch (struct thread *th) {
 /* Schedules a new process. At entry, interrupts must be off.
  * This function modify current thread's status to status and then
  * finds another thread to run and switches to it.
- * It's not safe to call printf() in the schedule(). */
+ * It's not safe to call printf () in the schedule(). */
 static void
 do_schedule(int status) {
 	ASSERT (intr_get_level () == INTR_OFF);

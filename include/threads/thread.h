@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -91,9 +92,34 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
+	
+	int64_t alarm_tick;
+	int init_priority;
+	int nice;
+	int recent_cpu; // fixed_point
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+
+	struct lock *waiting_lock;
+	struct list waiters;
+	struct list_elem w_elem;
+
+	/* Shared between thread.c and syscall.c. */
+	struct thread *parent;
+	struct list children;
+	struct list_elem c_elem;
+
+	struct semaphore sema_for_wait;
+	struct semaphore sema_for_exit;
+	struct semaphore sema_for_fork;
+
+	struct file **fd_table;
+	int fd_ptr;
+
+	int exit_status;
+	struct file *executing;
+	struct intr_frame *syscall_if;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -102,6 +128,8 @@ struct thread {
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	void *stack_bottom;
+	void *rsp;
 #endif
 
 	/* Owned by thread.c. */
@@ -133,13 +161,25 @@ const char *thread_name (void);
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 
+void thread_sleep (int64_t ticks);
+void thread_awake (int64_t ticks);
+
 int thread_get_priority (void);
 void thread_set_priority (int);
+void update_running_thread (void);
+bool greater_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void calc_load_avg (void);
+void increase_recent_cpu (struct thread *t);
+void calc_recent_cpu (struct thread *t);
+void calc_priority (struct thread *t);
+void update_recent_cpu_all (void);
+void update_priority_all (void);
 
 void do_iret (struct intr_frame *tf);
 
