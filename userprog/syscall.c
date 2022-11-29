@@ -61,7 +61,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	check_address (f->rsp);
 	// process.c의 process_fork에서 사용할 인터럽트 프레임 저장
 	thread_current ()->syscall_if = f;
+  #ifdef VM
 	thread_current ()->rsp = f->rsp;
+  #endif
 	// exit (-1);
 
 	switch(f->R.rax) {
@@ -107,12 +109,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE:
 			close (f->R.rdi);
 			break;
+    #ifdef VM
 		case SYS_MMAP:
 			f->R.rax = mmap (f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
 			break;
 		case SYS_MUNMAP:
 			munmap (f->R.rdi);
 			break;
+    #endif
 		default:
 			// printf ("default\n");
 			exit (-1);
@@ -315,6 +319,7 @@ void close (int fd) {
 	process_close_file (fd);
 }
 
+#ifdef VM
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	// printf ("\nmmap: addr[%p], length[%d], addr+length[%p], writable[%s], fd[%d], offset[%d]\n\n",
 	// 	addr, length, addr + length, writable ? "true" : "false", fd, offset);
@@ -355,3 +360,4 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 void munmap (void *addr) {
 	do_munmap (addr);
 }
+#endif
