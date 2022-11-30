@@ -68,6 +68,5 @@
       "disk.h": "c",
       "bitmap.h": "c",
       "free-map.h": "c"
-    },
-    "C_Cpp.errorSquiggles": "Disabled"
+    }
 }
