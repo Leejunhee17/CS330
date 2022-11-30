@@ -171,7 +171,7 @@ cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
   cluster_t empty;
-  for (empty = 2; empty < fat_fs->fat_length; empty++) {
+  for (empty = fat_fs->data_start; empty < fat_fs->fat_length; empty++) {
     if (fat_fs->fat[empty] == 0) {
       printf ("\nfat_create_chain: empty cluster[%d]\n\n", empty);
       break;
