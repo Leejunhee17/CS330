@@ -153,11 +153,14 @@ fat_boot_create (void) {
 void
 fat_fs_init (void) {
 	/* TODO: Your code goes here. */
-  // 실제 data가 저장 되는 sector = fat의 시작 sector + fat가 차지하는 sector 수
-  fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
-  // filesystem의 클러스터 수 = 총 sector 수 / cluster 당 sector 수
-  fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->data_start) / SECTORS_PER_CLUSTER;
-  lock_init (&fat_fs->write_lock);
+	// 실제 data가 저장 되는 sector = fat의 시작 sector + fat가 차지하는 sector 수
+	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
+	// filesystem의 클러스터 수 = 총 sector 수 / cluster 당 sector 수
+	fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->data_start) / SECTORS_PER_CLUSTER;
+	// last cluster = filesystem의 클러스터 수 - 1
+	fat_fs->last_clst = fat_fs->fat_length - 1;
+
+	lock_init (&fat_fs->write_lock);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -170,22 +173,19 @@ fat_fs_init (void) {
 cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
-  cluster_t empty;
-  for (empty = 0; empty < fat_fs->fat_length; empty++) {
-    if (fat_fs->fat[empty] == 0) {
-      printf ("\nfat_create_chain: empty cluster[%d]\n\n", empty);
-      break;
-    }
-  }
-  if (empty == fat_fs->fat_length) {
+	cluster_t empty_clst;
+	for (empty_clst = 2; empty_clst <= fat_fs->last_clst; empty_clst++) {
+		if (fat_fs->fat[empty_clst] == 0) {
+			fat_put (empty_clst, EOChain);
+			if (clst != 0) {
+				ASSERT (fat_get (clst) == EOChain);
+				fat_put (clst, empty_clst);
+			}
+			return empty_clst;
+		}
+	}
+
     return 0;
-  }
-  fat_put (empty, EOChain);
-  if (clst != 0) {
-    ASSERT (fat_get (clst) == EOChain);
-    fat_put (clst, empty);
-  }
-  return empty;
 }
 
 /* Remove the chain of clusters starting from CLST.
@@ -193,32 +193,37 @@ fat_create_chain (cluster_t clst) {
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
 	/* TODO: Your code goes here. */
-  ASSERT (pclst != 0 && fat_get (pclst) == clst);
-  for (cluster_t ptr = clst; ptr != EOChain; ptr = fat_get (clst)) {
-    fat_put (ptr, 0);
-  }
-  if (pclst != 0) {
-    fat_put (pclst, EOChain);
-  }
+
+	while (clst != EOChain) {
+		cluster_t next_clst = fat_get (clst);
+		fat_put (clst, 0);
+		clst = next_clst;
+	}
+
+	fat_put (clst, 0);
+
+	if (pclst != 0) {
+		fat_put (pclst, EOChain);
+	}
 }
 
 /* Update a value in the FAT table. */
 void
 fat_put (cluster_t clst, cluster_t val) {
 	/* TODO: Your code goes here. */
-  fat_fs->fat[clst] = val;
+	fat_fs->fat[clst] = val;
 }
 
 /* Fetch a value in the FAT table. */
 cluster_t
 fat_get (cluster_t clst) {
 	/* TODO: Your code goes here. */
-  return fat_fs->fat[clst];
+	return fat_fs->fat[clst];
 }
 
 /* Covert a cluster # to a sector number. */
 disk_sector_t
 cluster_to_sector (cluster_t clst) {
 	/* TODO: Your code goes here. */
-  return fat_fs->data_start + clst * SECTORS_PER_CLUSTER;
+	return fat_fs->data_start + clst * SECTORS_PER_CLUSTER;
 }
