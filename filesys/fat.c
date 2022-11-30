@@ -156,7 +156,7 @@ fat_fs_init (void) {
   // 실제 data가 저장 되는 sector = fat의 시작 sector + fat가 차지하는 sector 수
   fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
   // filesystem의 클러스터 수 = 총 sector 수 / cluster 당 sector 수
-  fat_fs->fat_length = fat_fs->bs.fat_sectors / SECTORS_PER_CLUSTER;
+  fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->data_start) / SECTORS_PER_CLUSTER;
   lock_init (&fat_fs->write_lock);
 }
 
@@ -171,7 +171,7 @@ cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
   cluster_t empty;
-  for (empty = fat_fs->data_start; empty < fat_fs->fat_length; empty++) {
+  for (empty = 0; empty < fat_fs->fat_length; empty++) {
     if (fat_fs->fat[empty] == 0) {
       printf ("\nfat_create_chain: empty cluster[%d]\n\n", empty);
       break;
