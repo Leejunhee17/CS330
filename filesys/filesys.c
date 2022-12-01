@@ -9,6 +9,7 @@
 #include "devices/disk.h"
 #ifdef EFILESYS
 #include "filesys/fat.h"
+#include "threads/thread.h"
 #endif
 
 /* The disk that contains the file system. */
@@ -33,6 +34,8 @@ filesys_init (bool format) {
 		do_format ();
 
 	fat_open ();
+
+	thread_current ()->cwd = dir_open_root ();
 #else
 	/* Original FS */
 	free_map_init ();
@@ -63,17 +66,20 @@ filesys_done (void) {
 bool
 filesys_create (const char *name, off_t initial_size) {
 	disk_sector_t inode_sector = 0;
-	struct dir *dir = dir_open_root ();
 #ifdef EFILESYS
+	char *file_name;
+	struct dir *dir = dir_open_from_path (name, &file_name);
 	cluster_t inode_clst = fat_create_chain (0);
 	inode_sector = cluster_to_sector (inode_clst);
 	bool success = (dir != NULL
 			&& inode_clst != 0
-			&& inode_create (inode_sector, initial_size)
-			&& dir_add (dir, name, inode_sector));
+			&& (initial_size > 0 ? (inode_create (inode_sector, initial_size)) : dir_create (inode_sector, 16))
+			&& dir_add (dir, file_name, inode_sector));
+	
 	if (!success && inode_sector != 0)
 		fat_remove_chain (inode_clst, 0); 
 #else
+	struct dir *dir = dir_open_root ();
 	bool success = (dir != NULL
 			&& free_map_allocate (1, &inode_sector)
 			&& inode_create (inode_sector, initial_size)

@@ -14,6 +14,9 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
+#ifdef EFILESYS
+#include "filesys/directory.h"
+#endif
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -117,6 +120,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			munmap (f->R.rdi);
 			break;
     #endif
+	#ifdef EFILESYS
+		case SYS_CHDIR:
+			f->R.rax = chdir (f->R.rdi);
+			break;
+		case SYS_MKDIR:
+			f->R.rax = mkdir (f->R.rdi);
+			break;
+	#endif
 		default:
 			// printf ("default\n");
 			exit (-1);
@@ -359,5 +370,28 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 
 void munmap (void *addr) {
 	do_munmap (addr);
+}
+#endif
+
+#ifdef EFILESYS
+bool chdir (const char *dir) {
+	char *dir_name;
+	struct dir* directory = dir_open_from_path (dir, &dir_name);
+
+	struct inode *inode;
+
+	if (dir_lookup (directory, dir_name, &inode)) {
+		dir = dir_open (inode);
+		if (dir != NULL) {
+			thread_current ()->cwd = dir;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool mkdir (const char *dir) {
+	return filesys_create (dir, 0);
 }
 #endif

@@ -6,6 +6,7 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 #include "filesys/fat.h"
+#include "threads/thread.h"
 
 /* A directory. */
 struct dir {
@@ -219,3 +220,37 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 	}
 	return false;
 }
+
+#ifdef EFILESYS
+// "a/b/c" 인 경우 디렉토리 b 오픈 후 리턴, name에 c 저장
+struct dir *
+dir_open_from_path (const char *path, char **name) {
+	struct dir *dir;
+	struct inode *inode;
+	
+	if (path[0] == '/') {
+		dir = dir_open_root ();
+	} else {
+		dir = dir_reopen (thread_current ()->cwd);
+	}
+
+	char *save_ptr;
+	char *token = strtok_r (path, "/", &save_ptr);
+	
+	while (token != NULL) {
+		*name = token;
+		token = strtok_r (NULL, "/", &save_ptr);
+
+		if (token != NULL) {
+			if (dir_lookup (dir, token, &inode)) {
+				dir_close (dir);
+				dir = dir_open (inode);
+			}
+		} else {
+			return dir;
+		}
+	}
+
+	return NULL;
+}
+#endif
