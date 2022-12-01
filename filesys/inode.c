@@ -46,19 +46,13 @@ byte_to_sector (const struct inode *inode, off_t pos) {
 	ASSERT (inode != NULL);
 	if (pos < inode->data.length) {
 #ifdef EFILESYS
-		disk_sector_t off_sectors = pos / DISK_SECTOR_SIZE;
-		cluster_t clst = fat_get (inode->data.start);
-		if (clst != 0) {
-			while (off_sectors > 0) {
-				clst = fat_get (clst);
-				if (clst == EOChain) {
-					printf ("@@@ byte_to_sector: clst == EOChain\n");
-					return -1;
-				}
-				off_sectors--;
-			}
+		cluster_t clst = sector_to_cluster (inode->data.start);
+		off_t off_sectors = pos / DISK_SECTOR_SIZE;
+		while (off_sectors > 0) {
+			clst = fat_get(clst);
+			off_sectors--;
 		}
-		return cluster_to_sector (clst);
+		return clst;
 #else
 		return inode->data.start + pos / DISK_SECTOR_SIZE;
 #endif
@@ -97,7 +91,6 @@ inode_create (disk_sector_t sector, off_t length) {
 		size_t sectors = bytes_to_sectors (length);
 		disk_inode->length = length;
 		disk_inode->magic = INODE_MAGIC;
-
 #ifdef EFILESYS
 		cluster_t clst = fat_create_chain (0);
 		if (clst != 0) {
@@ -107,7 +100,8 @@ inode_create (disk_sector_t sector, off_t length) {
 				static char zeros[DISK_SECTOR_SIZE];
 				size_t i;
 				
-				for (i = 0; i < sectors; i++) {
+				disk_write (filesys_disk, cluster_to_sector (clst), zeros);
+				for (i = 0; i < sectors - 1; i++) {
 					clst = fat_create_chain (clst);
 					if (clst == 0) {
 						return success;
@@ -117,7 +111,7 @@ inode_create (disk_sector_t sector, off_t length) {
 			}
 			success = true;
 		}
-		#else
+#else
 		if (free_map_allocate (sectors, &disk_inode->start)) {
 			disk_write (filesys_disk, sector, disk_inode);
 			if (sectors > 0) {
@@ -129,7 +123,7 @@ inode_create (disk_sector_t sector, off_t length) {
 			}
 			success = true; 
 		}
-		#endif
+#endif
 		free (disk_inode);
 	}
 	return success;
@@ -198,9 +192,14 @@ inode_close (struct inode *inode) {
 
 		/* Deallocate blocks if removed. */
 		if (inode->removed) {
+#ifdef EFILESYS
+			fat_remove_chain (inode->sector, 0);
+			fat_remove_chain (inode->data.start, 0);
+#else
 			free_map_release (inode->sector, 1);
 			free_map_release (inode->data.start,
 					bytes_to_sectors (inode->data.length)); 
+#endif
 		}
 
 		free (inode); 

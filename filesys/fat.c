@@ -200,8 +200,6 @@ fat_remove_chain (cluster_t clst, cluster_t pclst) {
 		clst = next_clst;
 	}
 
-	fat_put (clst, 0);
-
 	if (pclst != 0) {
 		fat_put (pclst, EOChain);
 	}
@@ -226,4 +224,13 @@ disk_sector_t
 cluster_to_sector (cluster_t clst) {
 	/* TODO: Your code goes here. */
 	return fat_fs->data_start + clst * SECTORS_PER_CLUSTER;
+}
+
+/* Covert a sector # to a cluster number. */
+cluster_t
+sector_to_cluster (disk_sector_t sector) {
+	if (sector >= fat_fs->data_start) {
+		return (sector - fat_fs->data_start) / SECTORS_PER_CLUSTER;
+	}
+	return -1;
 }
