@@ -193,7 +193,6 @@ fat_create_chain (cluster_t clst) {
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
 	/* TODO: Your code goes here. */
-
 	while (clst != EOChain) {
 		cluster_t next_clst = fat_get (clst);
 		fat_put (clst, 0);
@@ -209,6 +208,7 @@ fat_remove_chain (cluster_t clst, cluster_t pclst) {
 void
 fat_put (cluster_t clst, cluster_t val) {
 	/* TODO: Your code goes here. */
+  // printf ("@@@ fat_put: clst = %d, val = %d\n", clst, val);
 	fat_fs->fat[clst] = val;
 }
 
@@ -216,6 +216,7 @@ fat_put (cluster_t clst, cluster_t val) {
 cluster_t
 fat_get (cluster_t clst) {
 	/* TODO: Your code goes here. */
+  // printf ("@@@ fat_get: clst = %d, val = %d\n", clst, fat_fs->fat[clst]);
 	return fat_fs->fat[clst];
 }
 

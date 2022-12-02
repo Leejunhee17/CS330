@@ -197,8 +197,8 @@ inode_close (struct inode *inode) {
 		/* Deallocate blocks if removed. */
 		if (inode->removed) {
 #ifdef EFILESYS
-			fat_remove_chain (inode->sector, 0);
-			fat_remove_chain (inode->data.start, 0);
+			fat_remove_chain (sector_to_cluster (inode->sector), 0);
+			fat_remove_chain (sector_to_cluster (inode->data.start), 0);
 #else
 			free_map_release (inode->sector, 1);
 			free_map_release (inode->data.start,
