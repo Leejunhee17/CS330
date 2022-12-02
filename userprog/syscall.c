@@ -64,9 +64,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	check_address (f->rsp);
 	// process.c의 process_fork에서 사용할 인터럽트 프레임 저장
 	thread_current ()->syscall_if = f;
-  #ifdef VM
+#ifdef VM
 	thread_current ()->rsp = f->rsp;
-  #endif
+#endif
 	// exit (-1);
 
 	switch(f->R.rax) {
@@ -112,29 +112,31 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE:
 			close (f->R.rdi);
 			break;
-    #ifdef VM
+#ifdef VM
 		case SYS_MMAP:
 			f->R.rax = mmap (f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
 			break;
 		case SYS_MUNMAP:
 			munmap (f->R.rdi);
 			break;
-    #endif
-	#ifdef EFILESYS
+#endif
+#ifdef EFILESYS
 		case SYS_CHDIR:
 			f->R.rax = chdir (f->R.rdi);
 			break;
 		case SYS_MKDIR:
 			f->R.rax = mkdir (f->R.rdi);
 			break;
-	#endif
+    case SYS_SYMLINK:
+#endif
 		default:
 			// printf ("default\n");
 			exit (-1);
 	}
 }
 
-void check_address (void *addr) {
+void
+check_address (void *addr) {
 	// 잘못된 주소를 참조 시 프로세스 종료 ex) 널 포인터, 커널 영역 침범, 매핑 되지 않은 유저 영역
 	// printf ("check_address: addr[%x]\n", addr);
 	if (!addr) {
@@ -145,21 +147,22 @@ void check_address (void *addr) {
 		// printf ("Over KERN_BASE\n");
 		exit (-1);
 	}
-	#ifdef VM
+#ifdef VM
 	if (spt_find_page (&thread_current ()->spt, addr) == NULL) {
 		// printf ("Unallocated addr\n");
 		exit (-1);
 	}
-	#else
+#else
 	if (!pml4_get_page (thread_current ()->pml4, addr)) {
 		// printf ("Unmapped\n");
 		exit (-1);
 	}
-	#endif
+#endif
 }
 
 #ifdef VM
-void check_buffer (void *buffer, unsigned length, bool is_write) {
+void
+check_buffer (void *buffer, unsigned length, bool is_write) {
 	for (unsigned i = 0; i < length; i++) {
 		struct page *p = spt_find_page (&thread_current ()->spt, buffer + i);
 		if (is_kernel_vaddr(buffer + i) || p == NULL || (is_write && !p->writable)) {
@@ -169,11 +172,13 @@ void check_buffer (void *buffer, unsigned length, bool is_write) {
 }
 #endif
 
-void halt (void) {
+void
+halt (void) {
 	power_off ();
 }
 
-void exit (int status) {
+void
+exit (int status) {
 	// user program만 대한 exit 관련 문구를 출력하기 위해 여기서 printf
 	// printf("syscall_exit: called by (%s)[%d]\n", thread_current ()->name, thread_current ()->tid);
 	struct thread *curr = thread_current ();
@@ -182,12 +187,14 @@ void exit (int status) {
 	thread_exit ();
 }
 
-int fork (const char *thread_name) {
+pid_t
+fork (const char *thread_name) {
 	// printf ("syscall_fork: (%s)[%d] fork child(%s)\n", thread_current ()->name, thread_current ()->tid, thread_name);
 	return process_fork (thread_name, 0);
 }
 
-int exec (const char *file) {
+int
+exec (const char *file) {
 	check_address(file);
 	struct thread *curr = thread_current ();
 	char *fn_copy = palloc_get_page (PAL_USER | PAL_ZERO);
@@ -200,12 +207,14 @@ int exec (const char *file) {
 		exit (-1);
 }
 
-int wait (pid_t pid) {
+int
+wait (pid_t pid) {
 	// printf ("syscall_wait: (%s)[%d] wait(%d) in [%d]children\n", thread_current ()->name, thread_current ()->tid, pid,list_size (&thread_current ()->children));
 	return process_wait (pid);
 }
 
-bool create (const char *file, unsigned initial_size) {
+bool
+create (const char *file, unsigned initial_size) {
 	check_address (file);
 	// printf("syscall_create: (%s)[%d] create [%x] with [%u]\n", thread_current ()->name, thread_current ()->tid, file, initial_size);
 	lock_acquire (&filesys_lock);
@@ -214,7 +223,8 @@ bool create (const char *file, unsigned initial_size) {
 	return ret;
 }
 
-bool remove (const char *file) {
+bool
+remove (const char *file) {
 	check_address (file);
 	// printf("syscall_remove: (%s)[%d] remove [%x]\n", thread_current ()->name, thread_current ()->tid, file);
 	lock_acquire (&filesys_lock);
@@ -223,7 +233,8 @@ bool remove (const char *file) {
 	return ret;
 }
 
-int open (const char *file) {
+int
+open (const char *file) {
 	check_address (file);
 	lock_acquire (&filesys_lock);
 	struct file *f = filesys_open (file);
@@ -237,7 +248,8 @@ int open (const char *file) {
 	return fd;
 }
 
-int filesize (int fd) {
+int
+filesize (int fd) {
 	struct file *f = process_get_file (fd);
 	if (!f) {
 		return -1;
@@ -246,11 +258,12 @@ int filesize (int fd) {
 	return ret;
 }
 
-int read (int fd, void *buffer, unsigned length) {
+int
+read (int fd, void *buffer, unsigned length) {
 	check_address (buffer);
-	#ifdef VM
+#ifdef VM
 	check_buffer (buffer, length, true);
-	#endif
+#endif
 	// printf ("\nprocess(%s)[%d] call read\n\n", thread_current ()->name, thread_current ()->tid);
 	int ret = 0;
 	if (fd == 0) {
@@ -279,11 +292,12 @@ int read (int fd, void *buffer, unsigned length) {
 	}
 }
 
-int write (int fd, const void *buffer, unsigned length) {
+int
+write (int fd, const void *buffer, unsigned length) {
 	check_address (buffer);
-	#ifdef VM
+#ifdef VM
 	check_buffer (buffer, length, false);
-	#endif
+#endif
 	// printf ("sysacll_write: (%s)[%d] call write on fd[%d] with buffer[%p]\n", 
 	// 	thread_current ()->name, thread_current ()->tid, fd, buffer);
 	int ret = 0;
@@ -309,7 +323,8 @@ int write (int fd, const void *buffer, unsigned length) {
 	}
 }
 
-void seek (int fd, unsigned position) {
+void
+seek (int fd, unsigned position) {
 	// printf("process(%s)[%d] seek file[%d] in table[%d]\n", thread_current ()->name, thread_current ()->tid, fd, thread_current ()->fd_ptr);
 	struct file *f = process_get_file (fd);
 	if (f) {
@@ -317,7 +332,8 @@ void seek (int fd, unsigned position) {
 	}
 }
 
-unsigned tell (int fd) {
+unsigned
+tell (int fd) {
 	struct file *f = process_get_file (fd);
 	if (!f) {
 		return -1;
@@ -326,12 +342,14 @@ unsigned tell (int fd) {
 	return ret;
 }
 
-void close (int fd) {
+void
+close (int fd) {
 	process_close_file (fd);
 }
 
 #ifdef VM
-void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+void *
+mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	// printf ("\nmmap: addr[%p], length[%d], addr+length[%p], writable[%s], fd[%d], offset[%d]\n\n",
 	// 	addr, length, addr + length, writable ? "true" : "false", fd, offset);
 	if (addr == NULL | is_kernel_vaddr (addr) | addr + length == NULL | is_kernel_vaddr (addr + length)) {
@@ -368,13 +386,15 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	return do_mmap (addr, length, writable, file, offset);
 }
 
-void munmap (void *addr) {
+void
+munmap (void *addr) {
 	do_munmap (addr);
 }
 #endif
 
 #ifdef EFILESYS
-bool chdir (const char *dir) {
+bool
+chdir (const char *dir) {
 	char *dir_name;
 	struct dir* directory = dir_open_from_path (dir, &dir_name);
 
@@ -391,7 +411,13 @@ bool chdir (const char *dir) {
 	return false;
 }
 
-bool mkdir (const char *dir) {
+bool
+mkdir (const char *dir) {
 	return filesys_create (dir, 0);
+}
+
+int
+symlink (const char* target, const char* linkpath) {
+  
 }
 #endif
