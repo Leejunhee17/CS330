@@ -47,12 +47,14 @@ byte_to_sector (const struct inode *inode, off_t pos) {
 	if (pos < inode->data.length) {
 #ifdef EFILESYS
 		cluster_t clst = sector_to_cluster (inode->data.start);
+		ASSERT (clst != -1);
 		off_t off_sectors = pos / DISK_SECTOR_SIZE;
 		while (off_sectors > 0) {
 			clst = fat_get(clst);
 			off_sectors--;
 		}
-		return clst;
+		// printf ("@@@ byte_to_sector: clst = %d\n", clst);
+		return cluster_to_sector (clst);
 #else
 		return inode->data.start + pos / DISK_SECTOR_SIZE;
 #endif
@@ -95,17 +97,19 @@ inode_create (disk_sector_t sector, off_t length) {
 		cluster_t clst = fat_create_chain (0);
 		if (clst != 0) {
 			disk_inode->start = cluster_to_sector (clst);
+      // printf ("@@@ inode_create: disk_write disk_inode(%d, %d) at sector(%d)\n", disk_inode->start, disk_inode->length, sector);
 			disk_write (filesys_disk, sector, disk_inode);
 			if (sector > 0) {
 				static char zeros[DISK_SECTOR_SIZE];
 				size_t i;
-				
+				// printf ("@@@ inode_create: disk_write disk_inode(%d, %d) at sector(%d)\n", disk_inode->start, disk_inode->length, cluster_to_sector (clst));
 				disk_write (filesys_disk, cluster_to_sector (clst), zeros);
 				for (i = 0; i < sectors - 1; i++) {
 					clst = fat_create_chain (clst);
 					if (clst == 0) {
 						return success;
 					}
+          // printf ("@@@ inode_create: disk_write disk_inode(%d, %d) at sector(%d)\n", disk_inode->start, disk_inode->length, cluster_to_sector (clst));
 					disk_write (filesys_disk, cluster_to_sector (clst), zeros);
 				}
 			}
