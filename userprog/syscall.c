@@ -442,7 +442,6 @@ isdir (int fd) {
 
 int
 inumber (int fd) {
-	printf ("@@@ inumber: fd = %d\n", fd);
 	struct file *f = process_get_file (fd);
 	if (f == NULL) {
 		return -1;
@@ -452,9 +451,6 @@ inumber (int fd) {
 
 int
 symlink (const char* target, const char* linkpath) {
-	char *link_name;
-	struct dir* link_dir = dir_open_from_path (linkpath, &link_name);
-	dir_add (link_dir, link_name, inode_get_inumber (file_get_inode (filesys_open (target))));
-	return 0;
+	return symlink_create (linkpath, target) - 1;
 }
 #endif

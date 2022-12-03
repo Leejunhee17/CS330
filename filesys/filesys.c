@@ -75,7 +75,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
 	// printf ("@@@ filesys_create: name = %s, inode_clst = %d, sector = %d\n", name, inode_clst, inode_sector);
 	bool success = (dir != NULL
 			&& inode_clst != 0
-			&& (is_dir ? dir_create (inode_sector, 0) : inode_create (inode_sector, initial_size, false))
+			&& inode_create (inode_sector, initial_size, is_dir)
 			&& dir_add (dir, file_name, inode_sector));
 
 	if (is_dir) {
@@ -101,6 +101,28 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
 	return success;
 }
 
+bool
+symlink_create (const char *name, const char *target) {
+	disk_sector_t inode_sector = 0;
+	char *file_name;
+	struct dir *dir = dir_open_from_path (name, &file_name);
+	
+	cluster_t inode_clst = fat_create_chain (0);
+	inode_sector = cluster_to_sector (inode_clst);
+	bool success = (dir != NULL
+			&& inode_clst != 0
+			&& inode_create (inode_sector, strlen (target), false)
+			&& dir_add (dir, file_name, inode_sector));
+
+	if (!success && inode_sector != 0)
+		fat_remove_chain (inode_clst, 0); 
+	dir_close (dir);
+
+	inode_set_symlink (inode_open (inode_sector), target);
+
+	return success;
+}
+
 /* Opens the file with the given NAME.
  * Returns the new file if successful or a null pointer
  * otherwise.
@@ -116,6 +138,10 @@ filesys_open (const char *name) {
 	if (dir != NULL)
 		dir_lookup (dir, file_name, &inode);
 	dir_close (dir);
+
+	if (inode_is_symlink (inode)) {
+		return filesys_open (inode_get_symlink_target (inode));
+	}
 
 	return file_open (inode);
 }
