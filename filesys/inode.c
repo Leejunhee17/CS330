@@ -18,6 +18,7 @@ struct inode_disk {
 	off_t length;                       /* File size in bytes. */
 	unsigned magic;                     /* Magic number. */
 	bool is_dir;						/* True if directory, false otherwise. */
+	bool is_symlink;					/* True if symlink, false otherwise. */
 	uint32_t unused[124];               /* Not used. */
 };
 
@@ -111,6 +112,7 @@ inode_create (disk_sector_t sector, off_t length, bool is_dir) {
 		if (clst != 0) {
 			disk_inode->start = cluster_to_sector (clst);
 			disk_inode->is_dir = is_dir;
+			disk_inode->is_symlink = false;
       // printf ("@@@ inode_create: disk_write disk_inode(%d, %d) at sector(%d)\n", disk_inode->start, disk_inode->length, sector);
 			disk_write (filesys_disk, sector, disk_inode);
 			if (sectors > 0) {
@@ -391,4 +393,24 @@ inode_length (const struct inode *inode) {
 bool
 inode_is_dir (const struct inode *inode) {
 	return inode->data.is_dir;
+}
+
+bool
+inode_is_symlink (const struct inode *inode) {
+	return inode->data.is_symlink;
+}
+
+void
+inode_set_symlink (struct inode *inode, const char *target) {
+	inode->data.is_symlink = true;
+	inode_write_at (inode, target, strlen (target), 0);
+}
+
+char *
+inode_get_symlink_target (struct inode *inode) {
+	char *target = malloc (inode->data.length + 1);
+	inode_read_at (inode, target, inode->data.length, 0);
+	target[inode->data.length] = '\0';
+	
+	return target;
 }
