@@ -16,6 +16,8 @@
 #endif
 #ifdef EFILESYS
 #include "filesys/directory.h"
+#include "filesys/inode.h"
+#include "filesys/file.h"
 #endif
 
 void syscall_entry (void);
@@ -126,6 +128,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		case SYS_MKDIR:
 			f->R.rax = mkdir (f->R.rdi);
+			break;
+		case SYS_READDIR:
+			break;
+		case SYS_ISDIR:
+			f->R.rax = isdir (f->R.rdi);
+			break;
+		case SYS_INUMBER:
+			break;
+		case SYS_SYMLINK:
 			break;
 	#endif
 		default:
@@ -302,6 +313,9 @@ int write (int fd, const void *buffer, unsigned length) {
 		if (!f) {
 			return -1;
 		}
+		if (inode_is_dir (file_get_inode (f))) {
+			return -1;
+		}
 		lock_acquire (&filesys_lock);
 		ret = file_write (f, buffer, length);
 		lock_release (&filesys_lock);
@@ -394,4 +408,14 @@ bool chdir (const char *dir) {
 bool mkdir (const char *dir) {
 	return filesys_create (dir, 0);
 }
+
+// bool readdir (int fd, char name[READDIR_MAX_LEN + 1]);
+
+bool isdir (int fd) {
+	struct file *f = process_get_file (fd);
+	return inode_is_dir (file_get_inode (f));
+}
+
+// int inumber (int fd);
+// int symlink (const char* target, const char* linkpath);
 #endif
