@@ -440,18 +440,17 @@ isdir (int fd) {
 
 int
 inumber (int fd) {
-  // printf ("@@@ inumber: fd = %d\n", fd);
-  struct file *f = process_get_file (fd);
-  if (f == NULL) {
-    return -1;
-  }
-  return inode_sector(file_get_inode (f));
+	// printf ("@@@ inumber: fd = %d\n", fd);
+	struct file *f = process_get_file (fd);
+	if (f == NULL) {
+		return -1;
+	}
+	return inode_get_inumber (file_get_inode (f));
 }
 
 int
 symlink (const char* target, const char* linkpath) {
-  char *link_name;
+	char *link_name;
 	struct dir* link_dir = dir_open_from_path (linkpath, &link_name);
-  
 }
 #endif
