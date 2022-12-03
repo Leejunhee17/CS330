@@ -222,6 +222,16 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 	return false;
 }
 
+void
+dir_seek (struct dir *dir, off_t new_pos) {
+  dir->pos = new_pos;
+}
+
+off_t
+dir_tell (struct dir *dir) {
+  return dir->pos;
+}
+
 #ifdef EFILESYS
 // "a/b/c" 인 경우 디렉토리 b 오픈 후 리턴, name에 c 저장
 struct dir *

@@ -97,7 +97,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
 		free_map_release (inode_sector, 1);
 #endif
 	dir_close (dir);
-  // printf ("@@@ filesys_create: %s\n", success ? "success" : "fail");
+  // printf ("@@@ filesys_create: name = %s, file_name = %s, %s\n", name, file_name, success ? "success" : "fail");
 	return success;
 }
 
@@ -130,8 +130,13 @@ symlink_create (const char *name, const char *target) {
  * or if an internal memory allocation fails. */
 struct file *
 filesys_open (const char *name) {
+	// printf ("@@@ filesys_open: name = %s\n", name);
 	char *file_name;
 	struct dir *dir = dir_open_from_path (name, &file_name);
+  if (!strcmp (file_name, "")) {
+    // printf ("@@@ filesys_open: name = %s\n", name);
+    return file_open (dir_get_inode (dir));
+  }
 
 	struct inode *inode = NULL;
 
