@@ -135,8 +135,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = isdir (f->R.rdi);
 			break;
 		case SYS_INUMBER:
+			f->R.rax = inumber (f->R.rdi);
 			break;
 		case SYS_SYMLINK:
+			f->R.rax = symlink (f->R.rdi, f->R.rsi);
 			break;
 	#endif
 		default:
@@ -440,7 +442,7 @@ isdir (int fd) {
 
 int
 inumber (int fd) {
-	// printf ("@@@ inumber: fd = %d\n", fd);
+	printf ("@@@ inumber: fd = %d\n", fd);
 	struct file *f = process_get_file (fd);
 	if (f == NULL) {
 		return -1;
@@ -452,5 +454,7 @@ int
 symlink (const char* target, const char* linkpath) {
 	char *link_name;
 	struct dir* link_dir = dir_open_from_path (linkpath, &link_name);
+	dir_add (link_dir, link_name, inode_get_inumber (file_get_inode (filesys_open (target))));
+	return 0;
 }
 #endif

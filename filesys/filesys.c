@@ -75,8 +75,15 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
 	// printf ("@@@ filesys_create: name = %s, inode_clst = %d, sector = %d\n", name, inode_clst, inode_sector);
 	bool success = (dir != NULL
 			&& inode_clst != 0
-			&& (is_dir ? dir_create (inode_sector, 16) : inode_create (inode_sector, initial_size, false))
+			&& (is_dir ? dir_create (inode_sector, 0) : inode_create (inode_sector, initial_size, false))
 			&& dir_add (dir, file_name, inode_sector));
+
+	if (is_dir) {
+		struct dir *new_dir = dir_open (inode_open (inode_sector));
+		dir_add (new_dir, ".", inode_sector);
+		dir_add (new_dir, "..", inode_get_inumber (dir_get_inode (dir)));
+		dir_close (new_dir);
+	}
 	
 	if (!success && inode_sector != 0)
 		fat_remove_chain (inode_clst, 0); 
@@ -136,8 +143,13 @@ do_format (void) {
 #ifdef EFILESYS
 	/* Create FAT and save it to the disk. */
 	fat_create ();
-	if (!dir_create (cluster_to_sector (ROOT_DIR_CLUSTER), 0))
+	disk_sector_t root_sector = cluster_to_sector (ROOT_DIR_CLUSTER);
+	if (!dir_create (root_sector, 0))
 		PANIC ("root directory creation failed");
+	struct dir *dir = dir_open_root ();
+	dir_add (dir, ".", root_sector);
+	dir_add (dir, "..", root_sector);
+	dir_close (dir);
 	fat_close ();
 #else
 	free_map_create ();
