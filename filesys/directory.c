@@ -225,32 +225,36 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 // "a/b/c" 인 경우 디렉토리 b 오픈 후 리턴, name에 c 저장
 struct dir *
 dir_open_from_path (const char *path, char **name) {
+	char *path_cpy = malloc (strlen (path) + 1);
+	strlcpy (path_cpy, path, strlen(path) + 1);
+
 	struct dir *dir;
 	struct inode *inode;
 	
-	if (path[0] == '/') {
+	if (path_cpy[0] == '/') {
 		dir = dir_open_root ();
+
 	} else {
 		dir = dir_reopen (thread_current ()->cwd);
 	}
 
 	char *save_ptr;
-	char *token = strtok_r (path, "/", &save_ptr);
-	
+	char *token = strtok_r (path_cpy, "/", &save_ptr);
+
 	while (token != NULL) {
 		*name = token;
 		token = strtok_r (NULL, "/", &save_ptr);
 
-		if (token != NULL) {
-			if (dir_lookup (dir, token, &inode)) {
-				dir_close (dir);
-				dir = dir_open (inode);
-			}
-		} else {
+		if (token == NULL) {
 			return dir;
+		}
+
+		if (dir_lookup (dir, *name, &inode)) {
+			dir_close (dir);
+			dir = dir_open (inode);
 		}
 	}
 
-	return NULL;
+	return dir;
 }
 #endif

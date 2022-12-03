@@ -220,7 +220,8 @@ bool create (const char *file, unsigned initial_size) {
 	check_address (file);
 	// printf("syscall_create: (%s)[%d] create [%x] with [%u]\n", thread_current ()->name, thread_current ()->tid, file, initial_size);
 	lock_acquire (&filesys_lock);
-	bool ret = filesys_create (file, initial_size);
+	bool ret = filesys_create (file, initial_size, false);
+	
 	lock_release (&filesys_lock);
 	return ret;
 }
@@ -406,7 +407,7 @@ bool chdir (const char *dir) {
 }
 
 bool mkdir (const char *dir) {
-	return filesys_create (dir, 0);
+	return filesys_create (dir, 0, true);
 }
 
 // bool readdir (int fd, char name[READDIR_MAX_LEN + 1]);

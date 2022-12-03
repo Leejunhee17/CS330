@@ -64,7 +64,7 @@ filesys_done (void) {
  * Fails if a file named NAME already exists,
  * or if internal memory allocation fails. */
 bool
-filesys_create (const char *name, off_t initial_size) {
+filesys_create (const char *name, off_t initial_size, bool is_dir) {
 	disk_sector_t inode_sector = 0;
 #ifdef EFILESYS
 	char *file_name;
@@ -73,7 +73,7 @@ filesys_create (const char *name, off_t initial_size) {
 	inode_sector = cluster_to_sector (inode_clst);
 	bool success = (dir != NULL
 			&& inode_clst != 0
-			&& (initial_size > 0 ? (inode_create (inode_sector, initial_size, false)) : dir_create (inode_sector, 16))
+			&& (is_dir ? dir_create (inode_sector, 16) : inode_create (inode_sector, initial_size, false))
 			&& dir_add (dir, file_name, inode_sector));
 	
 	if (!success && inode_sector != 0)
@@ -99,11 +99,13 @@ filesys_create (const char *name, off_t initial_size) {
  * or if an internal memory allocation fails. */
 struct file *
 filesys_open (const char *name) {
-	struct dir *dir = dir_open_root ();
+	char *file_name;
+	struct dir *dir = dir_open_from_path (name, &file_name);
+
 	struct inode *inode = NULL;
 
 	if (dir != NULL)
-		dir_lookup (dir, name, &inode);
+		dir_lookup (dir, file_name, &inode);
 	dir_close (dir);
 
 	return file_open (inode);
@@ -115,8 +117,10 @@ filesys_open (const char *name) {
  * or if an internal memory allocation fails. */
 bool
 filesys_remove (const char *name) {
-	struct dir *dir = dir_open_root ();
-	bool success = dir != NULL && dir_remove (dir, name);
+	char *file_name;
+	struct dir *dir = dir_open_from_path (name, &file_name);
+
+	bool success = dir != NULL && dir_remove (dir, file_name);
 	dir_close (dir);
 
 	return success;

@@ -101,7 +101,7 @@ inode_create (disk_sector_t sector, off_t length, bool is_dir) {
 			disk_inode->is_dir = is_dir;
       // printf ("@@@ inode_create: disk_write disk_inode(%d, %d) at sector(%d)\n", disk_inode->start, disk_inode->length, sector);
 			disk_write (filesys_disk, sector, disk_inode);
-			if (sector > 0) {
+			if (sectors > 0) {
 				static char zeros[DISK_SECTOR_SIZE];
 				size_t i;
 				// printf ("@@@ inode_create: disk_write disk_inode(%d, %d) at sector(%d)\n", disk_inode->start, disk_inode->length, cluster_to_sector (clst));
