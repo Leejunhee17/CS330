@@ -155,6 +155,7 @@ fat_fs_init (void) {
 	/* TODO: Your code goes here. */
 	// 실제 data가 저장 되는 sector = fat의 시작 sector + fat가 차지하는 sector 수
 	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
+  // printf ("@@@ fat_fs_init: fat_fs->bs.fat_start = %d, fat_fs->bs.fat_sectors = %d\n", fat_fs->bs.fat_start, fat_fs->bs.fat_sectors);
 	// filesystem의 클러스터 수 = 총 sector 수 / cluster 당 sector 수
 	fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->data_start) / SECTORS_PER_CLUSTER;
 	// last cluster = filesystem의 클러스터 수 - 1
@@ -224,6 +225,7 @@ fat_get (cluster_t clst) {
 disk_sector_t
 cluster_to_sector (cluster_t clst) {
 	/* TODO: Your code goes here. */
+  // printf ("@@@ cluster_to_sector: clst = %d, fat_fs->data_start = %d\n", clst, fat_fs->data_start);
 	return fat_fs->data_start + clst * SECTORS_PER_CLUSTER;
 }
 

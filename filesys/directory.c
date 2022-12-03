@@ -165,6 +165,7 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) {
 	success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
 done:
+  // printf ("@@@ dir_add: name = %s, sector = %d, %s\n", name, inode_sector, success ? "success" : "fail");
 	return success;
 }
 

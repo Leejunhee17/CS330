@@ -69,8 +69,10 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
 #ifdef EFILESYS
 	char *file_name;
 	struct dir *dir = dir_open_from_path (name, &file_name);
+
 	cluster_t inode_clst = fat_create_chain (0);
 	inode_sector = cluster_to_sector (inode_clst);
+	// printf ("@@@ filesys_create: name = %s, inode_clst = %d, sector = %d\n", name, inode_clst, inode_sector);
 	bool success = (dir != NULL
 			&& inode_clst != 0
 			&& (is_dir ? dir_create (inode_sector, 16) : inode_create (inode_sector, initial_size, false))
@@ -88,7 +90,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
 		free_map_release (inode_sector, 1);
 #endif
 	dir_close (dir);
-
+  // printf ("@@@ filesys_create: %s\n", success ? "success" : "fail");
 	return success;
 }
 
