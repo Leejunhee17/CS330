@@ -68,6 +68,7 @@
       "disk.h": "c",
       "bitmap.h": "c",
       "free-map.h": "c",
-      "debug.h": "c"
+      "debug.h": "c",
+      "inode.h": "c"
     }
 }

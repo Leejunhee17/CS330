@@ -255,7 +255,7 @@ dir_open_from_path (const char *path, char **name) {
 			dir = dir_open (inode);
 		}
 	}
-
+  free (path_cpy);
 	return dir;
 }
 #endif
