@@ -202,7 +202,7 @@ exit (int status) {
 
 pid_t
 fork (const char *thread_name) {
-	// printf ("syscall_fork: (%s)[%d] fork child(%s)\n", thread_current ()->name, thread_current ()->tid, thread_name);
+	// printf ("@@@ fork: parent = %s, child = %s\n", thread_current ()->name, thread_name);
 	return process_fork (thread_name, 0);
 }
 
@@ -214,7 +214,7 @@ exec (const char *file) {
 	if (fn_copy == NULL)
 		exit (-1);
 	strlcpy (fn_copy, file, strlen(file) + 1);
-	// printf ("syscall_exec: (%s)[%d] load (%s)...\n", curr->name, curr->tid, fn_copy);
+	// printf ("@@@ exec: thread = %s, fn_copy = %s, load...\n", curr->name, fn_copy);
 	if (process_exec (fn_copy) == -1)
 		// printf ("exec fail\n");
 		exit (-1);
@@ -262,7 +262,7 @@ open (const char *file) {
 		// printf ("@@@ open: fd = %d, fail\n", fd);
 		file_close (f);
 	}
-	printf ("@@@ open: thread = %s file = %s, fd = %d\n", thread_current ()->name, file, fd);
+	// printf ("@@@ open: thread = %s file = (%s, %p), fd = %d, \n", thread_current ()->name, file, f, fd);
 	return fd;
 }
 
@@ -416,7 +416,7 @@ munmap (void *addr) {
 #ifdef EFILESYS
 bool
 chdir (const char *dir) {
-  printf ("@@@ chdir: dir = %s\n", dir);
+  // printf ("@@@ chdir: dir = %s\n", dir);
 	char *dir_name;
 	struct dir* directory = dir_open_from_path (dir, &dir_name);
 
@@ -435,7 +435,7 @@ chdir (const char *dir) {
 
 bool
 mkdir (const char *dir) {
-  printf ("@@@ chdir: dir = %s\n", dir);
+  // printf ("@@@ chdir: dir = %s\n", dir);
 	return filesys_create (dir, 0, true);
 }
 
@@ -446,7 +446,8 @@ readdir (int fd, char name[READDIR_MAX_LEN + 1]) {
   bool success = false;
   if (inode_is_dir (inode)) {
     struct dir *dir = dir_open (inode);
-		printf ("@@@ readdir: 1st file_tell = %d\n", file_tell (f));
+		// printf ("@@@ readdir: dir = %p, sector = %d\n", dir, inode_get_inumber (inode));
+		// printf ("@@@ readdir: 1st file_tell = %d\n", file_tell (f));
 		dir_seek (dir, file_tell (f));
 		if (file_tell (f) == 0) {
 			dir_readdir (dir, name);
@@ -454,10 +455,10 @@ readdir (int fd, char name[READDIR_MAX_LEN + 1]) {
 		}
     success = dir_readdir (dir, name);
     file_seek (f, dir_tell (dir));
-		printf ("@@@ readdir: 2nd file_tell = %d\n", file_tell (f));
+		// printf ("@@@ readdir: 2nd file_tell = %d\n", file_tell (f));
     dir_close (dir);
   }
-  printf ("@@@ readdir: fd = %d, name = %s, file_tell = %d, %s\n", fd, name, file_tell (f), success ? "success" : "fail");
+  // printf ("@@@ readdir: fd = %d, name = %s, file_tell = %d, %s\n", fd, name, file_tell (f), success ? "success" : "fail");
   return success;
 }
 
@@ -465,7 +466,7 @@ bool
 isdir (int fd) {
 	struct file *f = process_get_file (fd);
 	bool success = inode_is_dir (file_get_inode (f));
-	printf ("@@@ isdir: fd = %d, %s\n", fd, success ? "success" : "fail");
+	// printf ("@@@ isdir: fd = %d, %s\n", fd, success ? "success" : "fail");
 	return success;
 }
 
@@ -476,7 +477,7 @@ inumber (int fd) {
 		return -1;
 	}
 	int ret = inode_get_inumber (file_get_inode (f));
-	printf ("@@@ inumber: fd = %d, inumber = %d\n", fd, ret);
+	// printf ("@@@ inumber: fd = %d, inumber = %d\n", fd, ret);
 	return ret;
 }
 

@@ -209,6 +209,7 @@ inode_close (struct inode *inode) {
 	/* Release resources if this was the last opener. */
 	if (--inode->open_cnt == 0) {
 		/* Remove from inode list and release lock. */
+		// printf ("@@@ inode_close: inode = %p\n", inode);
 		list_remove (&inode->elem);
 
 		/* Deallocate blocks if removed. */

@@ -36,6 +36,7 @@ filesys_init (bool format) {
 	fat_open ();
 
 	thread_current ()->cwd = dir_open_root ();
+	// printf ("@@@ filesys_init: thread = %s, cwd = %p\n", thread_current ()->name, thread_current ()->cwd);
 #else
 	/* Original FS */
 	free_map_init ();
@@ -108,13 +109,15 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
  * or if an internal memory allocation fails. */
 struct file *
 filesys_open (const char *name) {
+	// printf ("@@@ filesys_open: thread = %s, cwd = %p, sector = %d\n", thread_current ()->name, thread_current ()->cwd, inode_get_inumber (dir_get_inode (thread_current ()->cwd)));
 	// printf ("@@@ filesys_open: name = %s\n", name);
+	if (!strcmp (name, "/")) {
+    // printf ("@@@ filesys_open: name = %s\n", name);
+    return file_open (dir_get_inode (dir_reopen (dir_open_root ())));
+  }
 	char *file_name;
 	struct dir *dir = dir_open_from_path (name, &file_name);
-  if (!strcmp (file_name, "")) {
-    // printf ("@@@ filesys_open: name = %s\n", name);
-    return file_open (dir_get_inode (dir));
-  }
+  
 
 	struct inode *inode = NULL;
 

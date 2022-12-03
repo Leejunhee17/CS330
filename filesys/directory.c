@@ -243,7 +243,7 @@ dir_open_from_path (const char *path, char **name) {
 	struct inode *inode;
 	
 	if (path_cpy[0] == '/') {
-		dir = dir_open_root ();
+		dir = dir_reopen(dir_open_root ());
 	} else {
 		dir = dir_reopen (thread_current ()->cwd);
 	}
