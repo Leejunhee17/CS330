@@ -69,6 +69,7 @@
       "bitmap.h": "c",
       "free-map.h": "c",
       "debug.h": "c",
-      "inode.h": "c"
+      "inode.h": "c",
+      "directory.h": "c"
     }
 }
