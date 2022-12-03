@@ -234,14 +234,15 @@ dir_open_from_path (const char *path, char **name) {
 	
 	if (path_cpy[0] == '/') {
 		dir = dir_open_root ();
-
 	} else {
 		dir = dir_reopen (thread_current ()->cwd);
 	}
 
+	*name = "";
+
 	char *save_ptr;
 	char *token = strtok_r (path_cpy, "/", &save_ptr);
-
+	
 	while (token != NULL) {
 		*name = token;
 		token = strtok_r (NULL, "/", &save_ptr);
