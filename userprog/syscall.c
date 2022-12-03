@@ -128,6 +128,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = mkdir (f->R.rdi);
 			break;
     case SYS_SYMLINK:
+      break;
 #endif
 		default:
 			// printf ("default\n");
@@ -216,7 +217,7 @@ wait (pid_t pid) {
 bool
 create (const char *file, unsigned initial_size) {
 	check_address (file);
-	// printf("syscall_create: (%s)[%d] create [%x] with [%u]\n", thread_current ()->name, thread_current ()->tid, file, initial_size);
+	// printf("@@@ create: thread(%s) create file(%s, %d)\n", thread_current ()->name, file, initial_size);
 	lock_acquire (&filesys_lock);
 	bool ret = filesys_create (file, initial_size);
 	lock_release (&filesys_lock);
@@ -413,11 +414,12 @@ chdir (const char *dir) {
 
 bool
 mkdir (const char *dir) {
+  printf ("@@@ mkdir: dir = %s\n", dir);
 	return filesys_create (dir, 0);
 }
 
 int
 symlink (const char* target, const char* linkpath) {
-  
+
 }
 #endif

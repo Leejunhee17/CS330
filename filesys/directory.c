@@ -25,6 +25,7 @@ struct dir_entry {
  * given SECTOR.  Returns true if successful, false on failure. */
 bool
 dir_create (disk_sector_t sector, size_t entry_cnt) {
+  // printf ("@@@ dir_create: %d\n", sector);
 	return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
 }
 
@@ -165,6 +166,7 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) {
 	success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
 done:
+  // printf ("@@@ dir_add: name = %s, sector = %d, %s\n", name, inode_sector, success ? "success" : "fail");
 	return success;
 }
 
@@ -229,6 +231,7 @@ dir_open_from_path (const char *path, char **name) {
 	struct inode *inode;
 	
 	if (path[0] == '/') {
+    // printf ("@@@ dir_open_from_path: root\n");
 		dir = dir_open_root ();
 	} else {
 		dir = dir_reopen (thread_current ()->cwd);

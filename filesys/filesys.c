@@ -67,17 +67,28 @@ bool
 filesys_create (const char *name, off_t initial_size) {
 	disk_sector_t inode_sector = 0;
 #ifdef EFILESYS
-	char *file_name;
-	struct dir *dir = dir_open_from_path (name, &file_name);
+	struct dir *dir = dir_open_root ();
 	cluster_t inode_clst = fat_create_chain (0);
 	inode_sector = cluster_to_sector (inode_clst);
+	// printf ("@@@ filesys_create: name = %s, inode_clst = %d, sector = %d\n", name, inode_clst, inode_sector);
 	bool success = (dir != NULL
 			&& inode_clst != 0
-			&& (initial_size > 0 ? (inode_create (inode_sector, initial_size)) : dir_create (inode_sector, 16))
-			&& dir_add (dir, file_name, inode_sector));
-	
+			&& inode_create (inode_sector, initial_size)
+			&& dir_add (dir, name, inode_sector));
 	if (!success && inode_sector != 0)
 		fat_remove_chain (inode_clst, 0); 
+	// char *file_name;
+	// struct dir *dir = dir_open_from_path (name, &file_name);
+	// cluster_t inode_clst = fat_create_chain (0);
+	// inode_sector = cluster_to_sector (inode_clst);
+	// // printf ("@@@ filesys_create: name = %s, inode_clst = %d, sector = %d\n", name, inode_clst, inode_sector);
+	// bool success = (dir != NULL
+	// 		&& inode_clst != 0
+	// 		&& (initial_size > 0 ? (inode_create (inode_sector, initial_size)) : dir_create (inode_sector, 16))
+	// 		&& dir_add (dir, file_name, inode_sector));
+	
+	// if (!success && inode_sector != 0)
+	// 	fat_remove_chain (inode_clst, 0); 
 #else
 	struct dir *dir = dir_open_root ();
 	bool success = (dir != NULL
@@ -88,7 +99,7 @@ filesys_create (const char *name, off_t initial_size) {
 		free_map_release (inode_sector, 1);
 #endif
 	dir_close (dir);
-
+  // printf ("@@@ filesys_create: %s\n", success ? "success" : "fail");
 	return success;
 }
 
