@@ -131,23 +131,21 @@ symlink_create (const char *name, const char *target) {
  * or if an internal memory allocation fails. */
 struct file *
 filesys_open (const char *name) {
-	// printf ("@@@ filesys_open: thread = %s, cwd = %p, sector = %d\n", thread_current ()->name, thread_current ()->cwd, inode_get_inumber (dir_get_inode (thread_current ()->cwd)));
-	// printf ("@@@ filesys_open: name = %s\n", name);
 	if (!strcmp (name, "/")) {
-    // printf ("@@@ filesys_open: name = %s\n", name);
-    return file_open (dir_get_inode (dir_reopen (dir_open_root ())));
-  }
+		return file_open (dir_get_inode (dir_reopen (dir_open_root ())));
+	}
+
 	char *file_name;
 	struct dir *dir = dir_open_from_path (name, &file_name);
-  
-
+	
 	struct inode *inode = NULL;
 
-	if (dir != NULL)
+	if (dir != NULL) {
 		dir_lookup (dir, file_name, &inode);
+	}
 	dir_close (dir);
 
-	if (inode_is_symlink (inode)) {
+	if (inode != NULL && inode_is_symlink (inode)) {
 		return filesys_open (inode_get_symlink_target (inode));
 	}
 

@@ -17,9 +17,9 @@ struct inode_disk {
 	disk_sector_t start;                /* First data sector. */
 	off_t length;                       /* File size in bytes. */
 	unsigned magic;                     /* Magic number. */
-	bool is_dir;						/* True if directory, false otherwise. */
-	bool is_symlink;					/* True if symlink, false otherwise. */
-	uint32_t unused[124];               /* Not used. */
+	bool is_dir;                        /* True if directory, false otherwise. */
+	bool is_symlink;                    /* True if symlink, false otherwise. */
+	bool unused[512 - 4 * 3 - 1 * 2];   /* Not used. */
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE

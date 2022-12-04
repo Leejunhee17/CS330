@@ -263,10 +263,50 @@ dir_open_from_path (const char *path, char **name) {
 
 		if (dir_lookup (dir, *name, &inode)) {
 			dir_close (dir);
-			dir = dir_open (inode);
+
+			if (inode_is_symlink (inode)) {
+				dir = dir_open_from_path_2 (inode_get_symlink_target (inode));
+			} else {
+				dir = dir_open (inode);
+			}
 		}
 	}
-  free (path_cpy);
+
+	free (path_cpy);
+
+	return dir;
+}
+
+struct dir *
+dir_open_from_path_2 (const char *path) {
+	struct dir *dir;
+	struct inode *inode;
+	
+	if (path[0] == '/') {
+		dir = dir_reopen(dir_open_root ());
+	} else {
+		dir = dir_reopen (thread_current ()->cwd);
+	}
+
+	char *save_ptr;
+	char *token = strtok_r (path, "/", &save_ptr);
+	
+	while (token != NULL) {
+		if (dir_lookup (dir, token, &inode)) {
+			dir_close (dir);
+
+			if (inode_is_symlink (inode)) {
+				dir = dir_open_from_path_2 (inode_get_symlink_target (inode));
+			} else {
+				dir = dir_open (inode);
+			}
+		} else {
+			PANIC ("dir_lookup failed");
+		}
+
+		token = strtok_r (NULL, "/", &save_ptr);
+	}
+
 	return dir;
 }
 #endif

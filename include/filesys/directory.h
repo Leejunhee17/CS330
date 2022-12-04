@@ -33,5 +33,6 @@ bool dir_readdir (struct dir *, char name[NAME_MAX + 1]);
 void dir_seek (struct dir *, off_t new_pos);
 off_t dir_tell(struct dir *);
 struct dir *dir_open_from_path (const char *path, char **name);
+struct dir *dir_open_from_path_2 (const char *path);
 
 #endif /* filesys/directory.h */
