@@ -229,10 +229,12 @@ wait (pid_t pid) {
 bool
 create (const char *file, unsigned initial_size) {
 	check_address (file);
+	if (!strcmp (file, "")) {
+		return false;
+	}
 	// printf("@@@ create: thread(%s) create file(%s, %d)\n", thread_current ()->name, file, initial_size);
 	lock_acquire (&filesys_lock);
 	bool ret = filesys_create (file, initial_size, false);
-	
 	lock_release (&filesys_lock);
 	return ret;
 }
@@ -240,6 +242,9 @@ create (const char *file, unsigned initial_size) {
 bool
 remove (const char *file) {
 	check_address (file);
+	if (!strcmp (file, "")) {
+		return false;
+	}
 	// printf("syscall_remove: (%s)[%d] remove [%x]\n", thread_current ()->name, thread_current ()->tid, file);
 	lock_acquire (&filesys_lock);
 	bool ret = filesys_remove (file);
@@ -250,6 +255,9 @@ remove (const char *file) {
 int
 open (const char *file) {
 	check_address (file);
+	if (!strcmp (file, "")) {
+		return -1;
+	}
 	lock_acquire (&filesys_lock);
 	struct file *f = filesys_open (file);
 	lock_release (&filesys_lock);
@@ -417,6 +425,9 @@ munmap (void *addr) {
 bool
 chdir (const char *dir) {
   // printf ("@@@ chdir: dir = %s\n", dir);
+	if (!strcmp (dir, "")) {
+		return false;
+	}
 	char *dir_name;
 	struct dir* directory = dir_open_from_path (dir, &dir_name);
 
@@ -435,7 +446,10 @@ chdir (const char *dir) {
 
 bool
 mkdir (const char *dir) {
-  // printf ("@@@ chdir: dir = %s\n", dir);
+	if (!strcmp (dir, "")) {
+		return false;
+	}
+  // printf ("@@@ mkdir: dir = %s\n", dir);
 	return filesys_create (dir, 0, true);
 }
 
@@ -454,7 +468,9 @@ readdir (int fd, char name[READDIR_MAX_LEN + 1]) {
 
 		if (file_tell (f) == 0) {
 			dir_readdir (dir, name);
+			ASSERT (!strcmp (name, "."));
 			dir_readdir (dir, name);
+			ASSERT (!strcmp (name, ".."));
 		}
 
 		success = dir_readdir (dir, name);
@@ -489,6 +505,9 @@ inumber (int fd) {
 
 int
 symlink (const char* target, const char* linkpath) {
+	if (!strcmp (target, "") || !strcmp (linkpath, "")) {
+		return false;
+	}
 	return symlink_create (linkpath, target) - 1;
 }
 #endif

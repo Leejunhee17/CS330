@@ -110,6 +110,7 @@ lookup (const struct dir *dir, const char *name,
 bool
 dir_lookup (const struct dir *dir, const char *name,
 		struct inode **inode) {
+	// printf ("@@@ dir_lookup: dir->inode = %p, name = %s\n", dir->inode, name);
 	struct dir_entry e;
 
 	ASSERT (dir != NULL);
@@ -236,16 +237,23 @@ dir_tell (struct dir *dir) {
 // "a/b/c" 인 경우 디렉토리 b 오픈 후 리턴, name에 c 저장
 struct dir *
 dir_open_from_path (const char *path, char **name) {
-	char *path_cpy = malloc (strlen (path) + 1);
-	strlcpy (path_cpy, path, strlen(path) + 1);
+	ASSERT (strcmp (path, ""));
+	char *path_cpy = malloc (strlen (path) + 3);
+	char root[3] = "./";
+	memcpy (path_cpy, root, 2);
+	memcpy (path_cpy + 2, path, strlen(path) + 1);
+	// printf ("@@@ dir_open_from_path: path = %s\n", path_cpy);
 
 	struct dir *dir;
 	struct inode *inode;
 	
-	if (path_cpy[0] == '/') {
+	if (path_cpy[2] == '/') {
 		dir = dir_reopen(dir_open_root ());
 	} else {
 		dir = dir_reopen (thread_current ()->cwd);
+	}
+	if (dir == NULL) {
+		return NULL;
 	}
 
 	*name = "";
@@ -267,8 +275,10 @@ dir_open_from_path (const char *path, char **name) {
 			if (inode_is_symlink (inode)) {
 				dir = dir_open_from_path_2 (inode_get_symlink_target (inode));
 			} else {
-				dir = dir_open (inode);
+				dir = dir_open (inode_reopen (inode));
 			}
+		} else {
+			return NULL;
 		}
 	}
 
@@ -279,6 +289,7 @@ dir_open_from_path (const char *path, char **name) {
 
 struct dir *
 dir_open_from_path_2 (const char *path) {
+	ASSERT (strcmp (path, ""));
 	struct dir *dir;
 	struct inode *inode;
 	

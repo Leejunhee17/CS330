@@ -66,6 +66,7 @@ filesys_done (void) {
  * or if internal memory allocation fails. */
 bool
 filesys_create (const char *name, off_t initial_size, bool is_dir) {
+	ASSERT (strcmp (name, ""));
 	disk_sector_t inode_sector = 0;
 #ifdef EFILESYS
 	char *file_name;
@@ -104,6 +105,8 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
 
 bool
 symlink_create (const char *name, const char *target) {
+	ASSERT (strcmp (name, ""));
+	ASSERT (strcmp (target, ""));
 	disk_sector_t inode_sector = 0;
 	char *file_name;
 	struct dir *dir = dir_open_from_path (name, &file_name);
@@ -115,7 +118,7 @@ symlink_create (const char *name, const char *target) {
 			&& inode_create (inode_sector, strlen (target), false)
 			&& dir_add (dir, file_name, inode_sector));
 
-	if (!success && inode_sector != 0)
+	if (!success && inode_clst != 0)
 		fat_remove_chain (inode_clst, 0); 
 	dir_close (dir);
 
@@ -131,6 +134,7 @@ symlink_create (const char *name, const char *target) {
  * or if an internal memory allocation fails. */
 struct file *
 filesys_open (const char *name) {
+	ASSERT (strcmp (name, ""));
 	if (!strcmp (name, "/")) {
 		return file_open (dir_get_inode (dir_reopen (dir_open_root ())));
 	}
@@ -143,8 +147,8 @@ filesys_open (const char *name) {
 	if (dir != NULL) {
 		dir_lookup (dir, file_name, &inode);
 	}
+	// printf ("@@@ filesys_open: name = %s, file_name = %s, inode = %p\n", name, file_name, inode);
 	dir_close (dir);
-
 	if (inode != NULL && inode_is_symlink (inode)) {
 		return filesys_open (inode_get_symlink_target (inode));
 	}
@@ -158,11 +162,33 @@ filesys_open (const char *name) {
  * or if an internal memory allocation fails. */
 bool
 filesys_remove (const char *name) {
+	ASSERT (strcmp (name, ""));
+	bool success = false;
 	char *file_name;
-	struct dir *dir = dir_open_from_path (name, &file_name);
-
-	bool success = dir != NULL && dir_remove (dir, file_name);
-	dir_close (dir);
+	struct dir *parent = dir_open_from_path (name, &file_name);
+	// printf ("@@@ filesys_remove: name = %s, file_name = %s\n", name, file_name);
+	if (parent == NULL)
+		return success;
+	
+	struct inode *inode = NULL;
+	dir_lookup (parent, file_name, &inode);
+	if (inode_is_dir (inode)) {
+		struct dir *child = dir_open (inode);
+		char sub[NAME_MAX + 1];
+		if (dir_tell (child) == 0) {
+			dir_readdir (child, sub);
+			ASSERT (!strcmp (sub, "."));
+			dir_readdir (child, sub);
+			ASSERT (!strcmp (sub, ".."));
+		}
+		if (!dir_readdir (child, sub)) {
+			success = dir_remove (child, ".") && dir_remove (child, "..") && dir_remove (parent, file_name);
+		}
+		dir_close (child);
+	} else {
+		success = dir_remove (parent, file_name);
+	}
+	dir_close (parent);
 
 	return success;
 }

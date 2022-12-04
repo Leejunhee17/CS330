@@ -12,7 +12,6 @@
 #define NAME_MAX 14
 
 typedef int off_t;
-struct dir_entry;
 
 struct inode;
 
