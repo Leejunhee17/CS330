@@ -253,10 +253,10 @@ open (const char *file) {
 	lock_acquire (&filesys_lock);
 	struct file *f = filesys_open (file);
 	lock_release (&filesys_lock);
-  if (f == NULL) {
-    // printf ("@@@ open: file = %s, fail\n", file);
-    return -1;
-  }
+	if (f == NULL) {
+		// printf ("@@@ open: file = %s, fail\n", file);
+		return -1;
+	}
 	int fd = process_add_file(f);
 	if (fd == -1) {
 		// printf ("@@@ open: fd = %d, fail\n", fd);
@@ -441,25 +441,31 @@ mkdir (const char *dir) {
 
 bool
 readdir (int fd, char name[READDIR_MAX_LEN + 1]) {
-  struct file *f = process_get_file (fd);
-  struct inode *inode = file_get_inode (f);
-  bool success = false;
-  if (inode_is_dir (inode)) {
-    struct dir *dir = dir_open (inode);
-		// printf ("@@@ readdir: dir = %p, sector = %d\n", dir, inode_get_inumber (inode));
-		// printf ("@@@ readdir: 1st file_tell = %d\n", file_tell (f));
+	// printf ("@@@@ readdir for fd %d \n", fd);
+
+	struct file *f = process_get_file (fd);
+	struct inode *inode = file_get_inode (f);
+
+	bool success = false;
+
+	if (inode_is_dir (inode)) {
+		struct dir *dir = dir_open (inode_reopen (inode));
 		dir_seek (dir, file_tell (f));
+
 		if (file_tell (f) == 0) {
 			dir_readdir (dir, name);
 			dir_readdir (dir, name);
 		}
-    success = dir_readdir (dir, name);
-    file_seek (f, dir_tell (dir));
-		// printf ("@@@ readdir: 2nd file_tell = %d\n", file_tell (f));
-    dir_close (dir);
-  }
-  // printf ("@@@ readdir: fd = %d, name = %s, file_tell = %d, %s\n", fd, name, file_tell (f), success ? "success" : "fail");
-  return success;
+
+		success = dir_readdir (dir, name);
+
+		file_seek (f, dir_tell (dir));
+		dir_close (dir);
+	}
+
+	// printf ("@@@@ readdir! %s \n", name);
+	
+	return success;
 }
 
 bool
