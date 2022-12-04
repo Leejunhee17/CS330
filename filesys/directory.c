@@ -203,6 +203,11 @@ dir_remove (struct dir *dir, const char *name) {
 	// printf ("@@@@ remove (inode) %d \n", inode_get_inumber (inode));
 
 	/* Remove inode. */
+	if (strcmp (name, ".") == 0 || strcmp (name, "..") == 0) {
+		success = true;
+		goto done;
+	}
+
 	inode_remove (inode);
 	success = true;
 
