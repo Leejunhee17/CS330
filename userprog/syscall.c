@@ -433,15 +433,18 @@ chdir (const char *dir) {
 
 	struct inode *inode;
 
+	bool success = false;
+
 	if (dir_lookup (directory, dir_name, &inode)) {
 		dir = dir_open (inode);
-		if (dir != NULL) {
-			thread_current ()->cwd = dir;
-			return true;
-		}
+		dir_close (thread_current ()->cwd);
+		thread_current ()->cwd = dir;
+		success = true;
 	}
 
-	return false;
+	dir_close (directory);
+
+	return success;
 }
 
 bool

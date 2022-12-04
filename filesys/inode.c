@@ -178,6 +178,8 @@ inode_open (disk_sector_t sector) {
 	list_push_front (&open_inodes, &inode->elem);
 	inode->sector = sector;
 	inode->open_cnt = 1;
+	// printf ("@@@@ inode open count! %d -> set 1 \n", inode->sector);
+	
 	inode->deny_write_cnt = 0;
 	inode->removed = false;
 	disk_read (filesys_disk, inode->sector, &inode->data);
@@ -188,8 +190,10 @@ inode_open (disk_sector_t sector) {
 /* Reopens and returns INODE. */
 struct inode *
 inode_reopen (struct inode *inode) {
-	if (inode != NULL)
+	if (inode != NULL) {
 		inode->open_cnt++;
+		// printf ("@@@@ inode open count! %d -> set %d (++) \n", inode->sector, inode->open_cnt);
+	}
 	return inode;
 }
 
@@ -208,6 +212,12 @@ inode_close (struct inode *inode) {
 	if (inode == NULL)
 		return;
 
+	// if (inode->removed) {
+	// 		fat_remove_chain (sector_to_cluster (inode->sector), 0);
+	// 		fat_remove_chain (sector_to_cluster (inode->data.start), 0);
+		// printf ("@@@@ yeah~ tell us the reason [%d] cnt: %d \n", inode->sector, inode->open_cnt);
+	// }
+
 	/* Release resources if this was the last opener. */
 	if (--inode->open_cnt == 0) {
 		/* Remove from inode list and release lock. */
@@ -217,6 +227,8 @@ inode_close (struct inode *inode) {
 		/* Deallocate blocks if removed. */
 		if (inode->removed) {
 #ifdef EFILESYS
+			// printf ("@@@@ haha %d \n", inode->sector);
+			
 			fat_remove_chain (sector_to_cluster (inode->sector), 0);
 			fat_remove_chain (sector_to_cluster (inode->data.start), 0);
 #else
@@ -227,6 +239,8 @@ inode_close (struct inode *inode) {
 		}
 
 		free (inode); 
+	} else {
+		// printf ("@@@@ inode open count! %d -> set %d (--) \n", inode->sector, inode->open_cnt);
 	}
 }
 

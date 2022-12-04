@@ -51,7 +51,7 @@ dir_open_root (void) {
 #ifdef EFILESYS
 	return dir_open (inode_open (cluster_to_sector (ROOT_DIR_CLUSTER)));
 #else
-	return dir_open (inode_open (ROOT_DIR_CLUSTER));
+	return dir_open (inode_open (ROOT_DIR_SECTOR));
 #endif
 }
 
@@ -175,6 +175,8 @@ done:
  * which occurs only if there is no file with the given NAME. */
 bool
 dir_remove (struct dir *dir, const char *name) {
+	// printf ("@@@@ remove %s from %d \n", name, inode_get_inumber (dir->inode));
+	
 	struct dir_entry e;
 	struct inode *inode = NULL;
 	bool success = false;
@@ -194,8 +196,11 @@ dir_remove (struct dir *dir, const char *name) {
 
 	/* Erase directory entry. */
 	e.in_use = false;
-	if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
+	if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) {
 		goto done;
+	}
+
+	// printf ("@@@@ remove (inode) %d \n", inode_get_inumber (inode));
 
 	/* Remove inode. */
 	inode_remove (inode);
@@ -225,19 +230,20 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 
 void
 dir_seek (struct dir *dir, off_t new_pos) {
-  dir->pos = new_pos;
+	dir->pos = new_pos;
 }
 
 off_t
 dir_tell (struct dir *dir) {
-  return dir->pos;
+	return dir->pos;
 }
 
 #ifdef EFILESYS
 // "a/b/c" 인 경우 디렉토리 b 오픈 후 리턴, name에 c 저장
 struct dir *
 dir_open_from_path (const char *path, char **name) {
-	ASSERT (strcmp (path, ""));
+	ASSERT (strcmp (path, "") != 0);
+
 	char *path_cpy = malloc (strlen (path) + 3);
 	char root[3] = "./";
 	memcpy (path_cpy, root, 2);
@@ -248,10 +254,11 @@ dir_open_from_path (const char *path, char **name) {
 	struct inode *inode;
 	
 	if (path_cpy[2] == '/') {
-		dir = dir_reopen(dir_open_root ());
+		dir = dir_open_root ();
 	} else {
 		dir = dir_reopen (thread_current ()->cwd);
 	}
+
 	if (dir == NULL) {
 		return NULL;
 	}
@@ -275,9 +282,10 @@ dir_open_from_path (const char *path, char **name) {
 			if (inode_is_symlink (inode)) {
 				dir = dir_open_from_path_2 (inode_get_symlink_target (inode));
 			} else {
-				dir = dir_open (inode_reopen (inode));
+				dir = dir_open (inode);
 			}
 		} else {
+			dir_close (dir);
 			return NULL;
 		}
 	}
@@ -294,7 +302,7 @@ dir_open_from_path_2 (const char *path) {
 	struct inode *inode;
 	
 	if (path[0] == '/') {
-		dir = dir_reopen(dir_open_root ());
+		dir = dir_open_root ();
 	} else {
 		dir = dir_reopen (thread_current ()->cwd);
 	}

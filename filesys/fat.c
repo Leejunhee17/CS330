@@ -193,8 +193,10 @@ fat_create_chain (cluster_t clst) {
  * If PCLST is 0, assume CLST as the start of the chain. */
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
+	// printf ("@@@@ remove chain! %d \n", clst);
+	
 	/* TODO: Your code goes here. */
-	while (clst != EOChain) {
+	while (clst != EOChain && clst != 0) {
 		cluster_t next_clst = fat_get (clst);
 		fat_put (clst, 0);
 		clst = next_clst;

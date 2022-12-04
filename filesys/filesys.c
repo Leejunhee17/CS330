@@ -86,6 +86,8 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
 		dir_add (new_dir, "..", inode_get_inumber (dir_get_inode (dir)));
 		dir_close (new_dir);
 	}
+
+	dir_close (dir);
 	
 	if (!success && inode_clst != 0)
 		fat_remove_chain (inode_clst, 0); 
@@ -98,7 +100,6 @@ filesys_create (const char *name, off_t initial_size, bool is_dir) {
 	if (!success && inode_sector != 0)
 		free_map_release (inode_sector, 1);
 #endif
-	dir_close (dir);
   // printf ("@@@ filesys_create: name = %s, file_name = %s, %s\n", name, file_name, success ? "success" : "fail");
 	return success;
 }
@@ -118,9 +119,10 @@ symlink_create (const char *name, const char *target) {
 			&& inode_create (inode_sector, strlen (target), false)
 			&& dir_add (dir, file_name, inode_sector));
 
+	dir_close (dir);
+
 	if (!success && inode_clst != 0)
 		fat_remove_chain (inode_clst, 0); 
-	dir_close (dir);
 
 	inode_set_symlink (inode_open (inode_sector), target);
 
@@ -136,7 +138,7 @@ struct file *
 filesys_open (const char *name) {
 	ASSERT (strcmp (name, ""));
 	if (!strcmp (name, "/")) {
-		return file_open (dir_get_inode (dir_reopen (dir_open_root ())));
+		return file_open (inode_open (cluster_to_sector (ROOT_DIR_CLUSTER)));
 	}
 
 	char *file_name;
@@ -145,15 +147,21 @@ filesys_open (const char *name) {
 	struct inode *inode = NULL;
 
 	if (dir != NULL) {
-		dir_lookup (dir, file_name, &inode);
+		if (dir_lookup (dir, file_name, &inode)) {
+			dir_close (dir);
+
+			if (inode_is_symlink (inode)) {
+				return filesys_open (inode_get_symlink_target (inode));
+			} else {
+				return file_open (inode);
+			}
+		}
+
+		dir_close (dir);
 	}
 	// printf ("@@@ filesys_open: name = %s, file_name = %s, inode = %p\n", name, file_name, inode);
-	dir_close (dir);
-	if (inode != NULL && inode_is_symlink (inode)) {
-		return filesys_open (inode_get_symlink_target (inode));
-	}
 
-	return file_open (inode);
+	return NULL;
 }
 
 /* Deletes the file named NAME.
