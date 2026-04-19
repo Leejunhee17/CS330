@@ -5,6 +5,8 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "filesys/fat.h"
+#include "threads/thread.h"
 
 /* A directory. */
 struct dir {
@@ -23,7 +25,7 @@ struct dir_entry {
  * given SECTOR.  Returns true if successful, false on failure. */
 bool
 dir_create (disk_sector_t sector, size_t entry_cnt) {
-	return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+	return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -46,7 +48,11 @@ dir_open (struct inode *inode) {
  * Return true if successful, false on failure. */
 struct dir *
 dir_open_root (void) {
+#ifdef EFILESYS
+	return dir_open (inode_open (cluster_to_sector (ROOT_DIR_CLUSTER)));
+#else
 	return dir_open (inode_open (ROOT_DIR_SECTOR));
+#endif
 }
 
 /* Opens and returns a new directory for the same inode as DIR.
@@ -104,6 +110,7 @@ lookup (const struct dir *dir, const char *name,
 bool
 dir_lookup (const struct dir *dir, const char *name,
 		struct inode **inode) {
+	// printf ("@@@ dir_lookup: dir->inode = %p, name = %s\n", dir->inode, name);
 	struct dir_entry e;
 
 	ASSERT (dir != NULL);
@@ -159,6 +166,7 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) {
 	success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
 done:
+  // printf ("@@@ dir_add: name = %s, sector = %d, %s\n", name, inode_sector, success ? "success" : "fail");
 	return success;
 }
 
@@ -167,6 +175,8 @@ done:
  * which occurs only if there is no file with the given NAME. */
 bool
 dir_remove (struct dir *dir, const char *name) {
+	// printf ("@@@@ remove %s from %d \n", name, inode_get_inumber (dir->inode));
+	
 	struct dir_entry e;
 	struct inode *inode = NULL;
 	bool success = false;
@@ -186,10 +196,18 @@ dir_remove (struct dir *dir, const char *name) {
 
 	/* Erase directory entry. */
 	e.in_use = false;
-	if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
+	if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) {
 		goto done;
+	}
+
+	// printf ("@@@@ remove (inode) %d \n", inode_get_inumber (inode));
 
 	/* Remove inode. */
+	if (strcmp (name, ".") == 0 || strcmp (name, "..") == 0) {
+		success = true;
+		goto done;
+	}
+
 	inode_remove (inode);
 	success = true;
 
@@ -214,3 +232,105 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 	}
 	return false;
 }
+
+void
+dir_seek (struct dir *dir, off_t new_pos) {
+	dir->pos = new_pos;
+}
+
+off_t
+dir_tell (struct dir *dir) {
+	return dir->pos;
+}
+
+#ifdef EFILESYS
+// "a/b/c" 인 경우 디렉토리 b 오픈 후 리턴, name에 c 저장
+struct dir *
+dir_open_from_path (const char *path, char **name) {
+	ASSERT (strcmp (path, "") != 0);
+
+	char *path_cpy = malloc (strlen (path) + 3);
+	char root[3] = "./";
+	memcpy (path_cpy, root, 2);
+	memcpy (path_cpy + 2, path, strlen(path) + 1);
+	// printf ("@@@ dir_open_from_path: path = %s\n", path_cpy);
+
+	struct dir *dir;
+	struct inode *inode;
+	
+	if (path_cpy[2] == '/') {
+		dir = dir_open_root ();
+	} else {
+		dir = dir_reopen (thread_current ()->cwd);
+	}
+
+	if (dir == NULL) {
+		return NULL;
+	}
+
+	*name = "";
+
+	char *save_ptr;
+	char *token = strtok_r (path_cpy, "/", &save_ptr);
+	
+	while (token != NULL) {
+		*name = token;
+		token = strtok_r (NULL, "/", &save_ptr);
+
+		if (token == NULL) {
+			return dir;
+		}
+
+		if (dir_lookup (dir, *name, &inode)) {
+			dir_close (dir);
+
+			if (inode_is_symlink (inode)) {
+				dir = dir_open_from_path_2 (inode_get_symlink_target (inode));
+			} else {
+				dir = dir_open (inode);
+			}
+		} else {
+			dir_close (dir);
+			return NULL;
+		}
+	}
+
+	free (path_cpy);
+
+	return dir;
+}
+
+struct dir *
+dir_open_from_path_2 (const char *path) {
+	ASSERT (strcmp (path, ""));
+	struct dir *dir;
+	struct inode *inode;
+	
+	if (path[0] == '/') {
+		dir = dir_open_root ();
+	} else {
+		dir = dir_reopen (thread_current ()->cwd);
+	}
+
+	char *save_ptr;
+	char *token = strtok_r (path, "/", &save_ptr);
+	
+	while (token != NULL) {
+		if (dir_lookup (dir, token, &inode)) {
+			dir_close (dir);
+
+			if (inode_is_symlink (inode)) {
+				dir = dir_open_from_path_2 (inode_get_symlink_target (inode));
+			} else {
+				dir = dir_open (inode);
+			}
+		} else {
+			PANIC ("dir_lookup failed");
+		}
+
+		token = strtok_r (NULL, "/", &save_ptr);
+	}
+
+	return dir;
+}
+#endif

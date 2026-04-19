@@ -4,7 +4,7 @@
         "name": "(gdb) CS330",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/vm/build/kernel.o",
+        "program": "${workspaceFolder}/filesys/build/kernel.o",
         "miDebuggerServerAddress": "localhost:1234",
         "args": [],
         "stopAtEntry": false,

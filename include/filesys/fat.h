@@ -16,6 +16,7 @@ typedef uint32_t cluster_t;  /* Index of a cluster within FAT. */
 /* Sectors of FAT information. */
 #define SECTORS_PER_CLUSTER 1 /* Number of sectors per cluster */
 #define FAT_BOOT_SECTOR 0     /* FAT boot sector. */
+#define ROOT_DIR_SECTOR 1    /* Sector for the root directory */
 #define ROOT_DIR_CLUSTER 1    /* Cluster for the root directory */
 
 void fat_init (void);
@@ -34,5 +35,6 @@ void fat_remove_chain (
 cluster_t fat_get (cluster_t clst);
 void fat_put (cluster_t clst, cluster_t val);
 disk_sector_t cluster_to_sector (cluster_t clst);
+cluster_t sector_to_cluster (disk_sector_t sector);
 
 #endif /* filesys/fat.h */

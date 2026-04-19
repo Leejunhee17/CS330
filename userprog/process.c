@@ -694,13 +694,13 @@ process_close_file(int fd) {
 	struct thread *curr = thread_current ();
 	// printf ("process_close_file: (%s) fd_ptr[%d]\n", curr->name, curr->fd_ptr);
 	struct file *f = process_get_file (fd);
+	// printf ("@@@ process_close_file: file = %p, fd = %d\n", f, fd);
 	if (f) {
 		for (int i = fd; i < curr->fd_ptr - 1; i++) {
 			curr->fd_table[i] = curr->fd_table[i + 1];
 		}
 		curr->fd_ptr--;
 		curr->fd_table[curr->fd_ptr] = NULL;
-		// printf ("process_close_file: file_close[%x]\n", f);
 		file_close (f);
 	}
 }

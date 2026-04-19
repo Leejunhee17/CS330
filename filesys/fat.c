@@ -153,6 +153,15 @@ fat_boot_create (void) {
 void
 fat_fs_init (void) {
 	/* TODO: Your code goes here. */
+	// 실제 data가 저장 되는 sector = fat의 시작 sector + fat가 차지하는 sector 수
+	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
+  // printf ("@@@ fat_fs_init: fat_fs->bs.fat_start = %d, fat_fs->bs.fat_sectors = %d\n", fat_fs->bs.fat_start, fat_fs->bs.fat_sectors);
+	// filesystem의 클러스터 수 = 총 sector 수 / cluster 당 sector 수
+	fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->data_start) / SECTORS_PER_CLUSTER;
+	// last cluster = filesystem의 클러스터 수 - 1
+	fat_fs->last_clst = fat_fs->fat_length - 1;
+
+	lock_init (&fat_fs->write_lock);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -165,29 +174,68 @@ fat_fs_init (void) {
 cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
+	cluster_t empty_clst;
+	for (empty_clst = 2; empty_clst <= fat_fs->last_clst; empty_clst++) {
+		if (fat_fs->fat[empty_clst] == 0) {
+			fat_put (empty_clst, EOChain);
+			if (clst != 0) {
+				ASSERT (fat_get (clst) == EOChain);
+				fat_put (clst, empty_clst);
+			}
+			return empty_clst;
+		}
+	}
+
+    return 0;
 }
 
 /* Remove the chain of clusters starting from CLST.
  * If PCLST is 0, assume CLST as the start of the chain. */
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
+	// printf ("@@@@ remove chain! %d \n", clst);
+	
 	/* TODO: Your code goes here. */
+	while (clst != EOChain && clst != 0) {
+		cluster_t next_clst = fat_get (clst);
+		fat_put (clst, 0);
+		clst = next_clst;
+	}
+
+	if (pclst != 0) {
+		fat_put (pclst, EOChain);
+	}
 }
 
 /* Update a value in the FAT table. */
 void
 fat_put (cluster_t clst, cluster_t val) {
 	/* TODO: Your code goes here. */
+  // printf ("@@@ fat_put: clst = %d, val = %d\n", clst, val);
+	fat_fs->fat[clst] = val;
 }
 
 /* Fetch a value in the FAT table. */
 cluster_t
 fat_get (cluster_t clst) {
 	/* TODO: Your code goes here. */
+  // printf ("@@@ fat_get: clst = %d, val = %d\n", clst, fat_fs->fat[clst]);
+	return fat_fs->fat[clst];
 }
 
 /* Covert a cluster # to a sector number. */
 disk_sector_t
 cluster_to_sector (cluster_t clst) {
 	/* TODO: Your code goes here. */
+  // printf ("@@@ cluster_to_sector: clst = %d, fat_fs->data_start = %d\n", clst, fat_fs->data_start);
+	return fat_fs->data_start + clst * SECTORS_PER_CLUSTER;
+}
+
+/* Covert a sector # to a cluster number. */
+cluster_t
+sector_to_cluster (disk_sector_t sector) {
+	if (sector >= fat_fs->data_start) {
+		return (sector - fat_fs->data_start) / SECTORS_PER_CLUSTER;
+	}
+	return -1;
 }
